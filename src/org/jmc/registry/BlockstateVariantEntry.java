@@ -1,8 +1,6 @@
 package org.jmc.registry;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
 import java.util.Map.Entry;
 
 import org.jmc.Blockstate;
@@ -11,6 +9,8 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import org.jmc.geom.Direction;
+import org.jmc.util.Log;
 
 public class BlockstateVariantEntry extends BlockstateEntry {
 	private ArrayList<HashMap<Blockstate, ModelListWeighted>> modelsList = new ArrayList<>();
@@ -18,7 +18,15 @@ public class BlockstateVariantEntry extends BlockstateEntry {
 	public BlockstateVariantEntry(NamespaceID name) {
 		super(name);
 	}
-	
+
+	public Optional<Blockstate> getDefaultState() {
+		Set<Blockstate> keys = modelsList.get(0).keySet();
+		if (id.path.equals("deepslate")) {
+			return keys.stream().filter(state -> state.get("axis").equalsIgnoreCase("Y")).findFirst();
+		}
+		return keys.stream().findFirst();
+	}
+
 	@Override
 	protected void parseJson(JsonElement variantsElem) {
 		HashMap<Blockstate, ModelListWeighted> models = new HashMap<>();

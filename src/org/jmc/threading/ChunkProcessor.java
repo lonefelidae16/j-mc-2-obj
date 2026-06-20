@@ -19,7 +19,9 @@ import org.jmc.NBT.TAG_List;
 import org.jmc.entities.Entity;
 import org.jmc.geom.*;
 import org.jmc.geom.FaceUtils.Face;
+import org.jmc.registry.BlockstateEntry;
 import org.jmc.registry.NamespaceID;
+import org.jmc.registry.Registries;
 import org.jmc.util.Log;
 
 
@@ -199,9 +201,13 @@ public class ChunkProcessor
 						if (oreBase != null) {
 							block.id = oreBase;
 							blockInfo = block.getInfo();
+							BlockstateEntry entry = Registries.getBlockstate(oreBase);
+							if (entry != null) {
+								entry.getDefaultState().ifPresent(state -> block.state = state);
+							}
 						}
 					}
-					
+
 					if(Options.objectPerBlock)
 						chunk_idx_count++;
 					
