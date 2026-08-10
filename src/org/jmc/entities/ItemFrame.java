@@ -66,12 +66,10 @@ public class ItemFrame extends Entity
 		if (itemRot != null) {
 			frameRotation = ((TAG_Byte)itemRot).value;
 			frameRotation = frameRotation * 90; // doku says: 45 degrees - but thats wrong (at least for "filled_map")
-			if (frameRotation > 180) {
-				frameRotation = 0 - 180 + (frameRotation - 180);
-			}
 		}
 
 		int baseRotation = 0;
+		int baseRotZ = 0;
 
 		switch (facing)
 		{
@@ -87,9 +85,13 @@ public class ItemFrame extends Entity
 			case 5:
 				baseRotation = -90;
 				break;
+			case 1:  // UP
+				baseRotZ = -90;
+				frameRotation += 180;
+				break;
 		}
 
-		rotate = Transform.rotation(0, baseRotation, frameRotation);
+		rotate = Transform.rotation(baseRotZ, baseRotation, normalizeRot(frameRotation));
 
 		translate = Transform.translation(pos.x, pos.y, pos.z);
 		rt = translate.multiply(rotate);
@@ -110,6 +112,17 @@ public class ItemFrame extends Entity
 		}
 		model.setMaterials(materials);
 		model.addEntity(obj, rt);
+	}
+
+	private static int normalizeRot(int rot) {
+		int normalized = rot % 360;
+		if (normalized >= 180) {
+			normalized -= 360;
+		}
+		if (normalized < -180) {
+			normalized += 360;
+		}
+		return normalized;
 	}
 	
 	private static boolean processMap(TAG_Compound item, BlockMaterial materials) {

@@ -5,4 +5,8 @@ public class MathHelper {
         int i = (int) value;
         return value < (double) i ? i - 1 : i;
     }
+
+    public static int lerp(int from, int to, float alpha) {
+        return floor(from + alpha * (to - from));
+    }
 }
