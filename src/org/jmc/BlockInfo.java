@@ -29,6 +29,8 @@ public class BlockInfo
 		TRANSPARENT,
 		/** The top face of the block below is not drawn */
 		BOTTOM,
+		SLABS,
+		STAIRS,
 		/** Special rules from model */
 		CUSTOM,
 		/** A closed transparent volume */

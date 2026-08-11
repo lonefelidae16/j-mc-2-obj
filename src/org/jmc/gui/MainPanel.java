@@ -668,11 +668,20 @@ public class MainPanel extends JPanel {
 							File[] pathDirectories = namespaceDir.listFiles(File::isDirectory);
 							return (pathDirectories != null) ? Arrays.stream(pathDirectories) : Stream.empty();
 						})
-						.forEach(pathDir -> {
+						.map(pathDir -> {
 							String namespace = pathDir.getParentFile().getName();
 							String path = pathDir.getName();
-							cbDimension.addItem(new NamespaceID(namespace, path));
-						});
+							return new NamespaceID(namespace, path);
+						})
+						.filter(identifier -> {
+							for (int i = 0; i < cbDimension.getItemCount(); ++i) {
+								if (cbDimension.getItemAt(i).equals(identifier)) {
+									return false;
+								}
+							}
+							return true;
+						})
+						.forEach(identifier -> cbDimension.addItem(identifier));
 			}
 		}
 	}

@@ -3,6 +3,7 @@ package org.jmc.registry;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Optional;
 
 import javax.annotation.Nonnull;
 
@@ -36,7 +37,11 @@ public abstract class BlockstateEntry extends RegistryEntry {
 	}
 	
 	protected abstract void parseJson(JsonElement json);
-	
+
+	public Optional<Blockstate> getDefaultState() {
+		return Optional.empty();
+	}
+
 	@Nonnull
 	public abstract List<ModelListWeighted> getModelsFor(Blockstate state);
 	
@@ -50,7 +55,7 @@ public abstract class BlockstateEntry extends RegistryEntry {
 		}
 		return map;
 	}
-	
+
 	public static class ModelInfo {
 		@SerializedName("model")
 		public NamespaceID id;

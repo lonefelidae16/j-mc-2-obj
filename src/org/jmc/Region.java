@@ -103,15 +103,15 @@ public class Region {
 	 * @throws IOException of error occurs
 	 */
 	public static Region findRegion(File saveFolder, NamespaceID dimension, Point regionCoord) throws IOException {
-		File dir;
-		if(dimension.equals(new NamespaceID("minecraft", "overworld"))) {
-			dir = new File(saveFolder.getAbsolutePath(), "region");
-		} else if (dimension.equals(new NamespaceID("minecraft", "the_nether"))) {
-			dir = new File(saveFolder.getAbsolutePath(), "DIM-1/region");
-		} else if (dimension.equals(new NamespaceID("minecraft", "the_end"))) {
-			dir = new File(saveFolder.getAbsolutePath(), "DIM1/region");
-		} else {
-			dir = new File(saveFolder.getAbsolutePath(), String.format("dimensions/%s/%s/region", dimension.namespace, dimension.path));
+		File dir = new File(saveFolder.getAbsolutePath(), String.format("dimensions/%s/%s/region", dimension.namespace, dimension.path));
+		if (!dir.exists()) {
+			if(dimension.equals(new NamespaceID("minecraft", "overworld"))) {
+				dir = new File(saveFolder.getAbsolutePath(), "region");
+			} else if (dimension.equals(new NamespaceID("minecraft", "the_nether"))) {
+				dir = new File(saveFolder.getAbsolutePath(), "DIM-1/region");
+			} else if (dimension.equals(new NamespaceID("minecraft", "the_end"))) {
+				dir = new File(saveFolder.getAbsolutePath(), "DIM1/region");
+			}
 		}
 		
 		File file = new File(dir, "/r."+regionCoord.x+"."+regionCoord.y+".mca");

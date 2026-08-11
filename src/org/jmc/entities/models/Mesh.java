@@ -8,9 +8,12 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
+import org.jmc.BlockMaterial;
+import org.jmc.Blockstate;
 import org.jmc.OBJInputFile;
 import org.jmc.OBJInputFile.OBJGroup;
 import org.jmc.geom.Transform;
+import org.jmc.registry.NamespaceID;
 import org.jmc.threading.ChunkProcessor;
 import org.jmc.util.Filesystem;
 import org.jmc.util.Filesystem.JmcConfFile;
@@ -20,7 +23,7 @@ import org.jmc.util.Log;
 //should figure out how to merge the two...
 
 @SuppressWarnings("unused")
-public class Mesh extends EntityModel
+public class Mesh extends EntityModel implements Cloneable
 {
 	
 	private static Map<String,OBJInputFile> files=null;
@@ -97,6 +100,23 @@ public class Mesh extends EntityModel
 	}
 
 	@Override
+	public void setMaterials(BlockMaterial val) {
+		super.setMaterials(val);
+
+		if (val != null && !objects.isEmpty()) {
+			final NamespaceID[] mats = val.get(new Blockstate(), NamespaceID.NULL);
+			for (int i = 0; i < objects.size(); ++i) {
+				final NamespaceID mat = mats[Math.min(i, mats.length - 1)];
+				if (mat.equals(NamespaceID.UNKNOWN)) {
+					continue;
+				}
+				final MeshObject object = objects.get(i);
+				object.group = object.file.overwriteMaterial(object.group, mat);
+			}
+		}
+	}
+
+	@Override
 	public void addEntity(ChunkProcessor obj, Transform transform) 
 	{
 		if(objects.size()==0) return;
@@ -104,4 +124,8 @@ public class Mesh extends EntityModel
 		object.file.addObjectToOutput(object.group, transform, obj, false);
 	}
 
+	@Override
+	public Mesh clone() throws CloneNotSupportedException {
+        return (Mesh) super.clone();
+	}
 }
