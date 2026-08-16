@@ -656,9 +656,12 @@ public class MainPanel extends JPanel {
 
 		cbDimension.removeAllItems();
 
-		cbDimension.addItem(new NamespaceID("minecraft", "overworld"));
-		cbDimension.addItem(new NamespaceID("minecraft", "the_nether"));
-		cbDimension.addItem(new NamespaceID("minecraft", "the_end"));
+		final NamespaceID nsOver = new NamespaceID("minecraft", "overworld");
+		final NamespaceID nsNether = new NamespaceID("minecraft", "the_nether");
+		final NamespaceID nsEnd = new NamespaceID("minecraft", "the_end");
+		cbDimension.addItem(nsOver);
+		cbDimension.addItem(nsNether);
+		cbDimension.addItem(nsEnd);
 		File dimDir = new File(save_dir, "dimensions");
 		if (dimDir.isDirectory()) {
 			File[] namespaceDirectories = dimDir.listFiles(File::isDirectory);
@@ -668,11 +671,12 @@ public class MainPanel extends JPanel {
 							File[] pathDirectories = namespaceDir.listFiles(File::isDirectory);
 							return (pathDirectories != null) ? Arrays.stream(pathDirectories) : Stream.empty();
 						})
-						.forEach(pathDir -> {
-							String namespace = pathDir.getParentFile().getName();
-							String path = pathDir.getName();
-							cbDimension.addItem(new NamespaceID(namespace, path));
-						});
+					.forEach(pathDir -> {
+						NamespaceID dim = new NamespaceID(pathDir.getParentFile().getName(), pathDir.getName());
+						if (dim.equals(nsOver) || dim.equals(nsNether) || dim.equals(nsEnd))
+							return;
+						cbDimension.addItem(dim);
+					});
 			}
 		}
 	}
