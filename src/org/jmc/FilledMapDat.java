@@ -13,14 +13,14 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.Optional;
 import java.util.zip.GZIPInputStream;
 
-import org.jmc.NBT.NBT_Tag;
-import org.jmc.NBT.TAG_Byte_Array;
-import org.jmc.NBT.TAG_Compound;
+import org.jmc.NBT.*;
 import org.jmc.registry.NamespaceID;
 import org.jmc.registry.Registries;
 import org.jmc.registry.TextureEntry;
+import org.jmc.util.Colors;
 import org.jmc.util.Log;
 
 /**
@@ -59,9 +59,13 @@ public class FilledMapDat {
 	public boolean open(String id)
 	{
 		map_id = id;
-		File mapFile=new File(levelDir.getAbsolutePath()+"/data/map_" + map_id + ".dat");
-		
-		if(!mapFile.exists()) return false;
+		File mapFile = new File(levelDir.getAbsolutePath(), "data/map_" + id + ".dat");
+		if (!mapFile.exists()) {
+			mapFile = new File(levelDir.getAbsolutePath(), "data/minecraft/maps/" + id + ".dat");
+		}
+		if (!mapFile.exists()) {
+			return false;
+		}
 			
 		try {
 			
@@ -91,40 +95,137 @@ public class FilledMapDat {
 	{
 		int image_width = 128;
 		int image_height = 128;
-		
+
 		TAG_Compound data=(TAG_Compound) root.getElement("data");
 		if (data==null) return new TAG_Byte_Array(null);
 		TAG_Byte_Array color_map =((TAG_Byte_Array)data.getElement("colors"));
 		
-		BufferedImage img = new BufferedImage(image_width, image_height, BufferedImage.TYPE_INT_RGB);
+		BufferedImage img = new BufferedImage(image_width, image_height, BufferedImage.TYPE_INT_ARGB);
 
 		for(int x=0; x<image_width; x++) {
 			for(int y=0; y<image_height; y++) {
 				int index = (y*image_height)+(x);
 				byte colorIdx = color_map.data[index];
-				img.setRGB(x, y, getColorByByte(colorIdx).getRGB());
+				Color color = getColorByByte(colorIdx);
+				int argb = color.getAlpha() << 24 | color.getRGB();
+				img.setRGB(x, y, argb);
 			}
 		}
-		
+
+		drawDecoration(img, data);
+
 		TextureEntry texEntry = Registries.getTexture(mapTexID);
 		texEntry.setImage(img);
 		
 
 		return color_map;
 	}
+
+	private static void drawDecoration(BufferedImage img, TAG_Compound data) {
+		final int image_width = img.getWidth();
+		final int image_height = img.getHeight();
+		final int imageHalfWidth = image_width / 2;
+		final int imageHalfHeight = image_height / 2;
+
+		Optional<Integer> xCenter = Optional.ofNullable((TAG_Int) data.getElement("xCenter")).map(tagInt -> tagInt.value);
+		Optional<Integer> zCenter = Optional.ofNullable((TAG_Int) data.getElement("zCenter")).map(tagInt -> tagInt.value);
+		if (!xCenter.isPresent() || !zCenter.isPresent()) {
+			return;
+		}
+
+		final int xCenterPos = xCenter.get();
+		final int zCenterPos = zCenter.get();
+		final int blockPerPixel;
+		{
+			int scale = Optional.ofNullable((TAG_Byte) data.getElement("scale")).map(tagByte -> (int) tagByte.value).orElse(0);
+			blockPerPixel = (int) Math.pow(2, scale);
+		}
+
+		TAG_List banners = (TAG_List) data.getElement("banners");
+		if (banners != null) {
+			for (NBT_Tag tag : banners.elements) {
+				TAG_Compound banner = (TAG_Compound) tag;
+				String color = Optional.ofNullable((TAG_String) banner.getElement("color")).map(tagString -> tagString.value).orElse(null);
+				TAG_Int_Array pos = (TAG_Int_Array) banner.getElement("pos");
+				if (pos != null) {
+					int mapPosX = (pos.data[0] - xCenterPos) / blockPerPixel + imageHalfWidth;
+					int mapPosZ = (pos.data[2] - zCenterPos) / blockPerPixel + imageHalfHeight;
+					drawBanner(img, mapPosX, mapPosZ, color);
+				}
+			}
+		}
+
+		TAG_List frames = (TAG_List) data.getElement("frames");
+		if (frames != null) {
+			TAG_Int_Array pos = (TAG_Int_Array) ((TAG_Compound) frames.getElement(0)).getElement("pos");
+			if (pos != null) {
+				int framePosX = (pos.data[0] - xCenterPos) / blockPerPixel + imageHalfWidth;
+				int framePosZ = (pos.data[2] - zCenterPos) / blockPerPixel + imageHalfHeight;
+				if (framePosX >= 0 && framePosX <= image_width && framePosZ >= 0 && framePosZ <= image_height) {
+					drawFramePosition(img, framePosX, framePosZ);
+				}
+			}
+		}
+	}
 	
-	
-	
-	
+	private static void drawBanner(BufferedImage img, int x, int z, String color) {
+		final Color bannerColor;
+		if (color == null) {
+			bannerColor = Color.WHITE;
+		} else {
+			bannerColor = Colors.fromString(color).orElse(Colors.WHITE);
+		}
+
+		final int mapDrawX = Math.max(3, Math.min(img.getWidth() - 2, x));
+		final int mapDrawY = Math.max(3, Math.min(img.getHeight() - 4, z));
+		final int black = Color.BLACK.getRGB();
+
+		for (int i = -1; i < 1; ++i) {
+			for (int j = -2; j < 3; ++j) {
+				img.setRGB(mapDrawX + i, mapDrawY + j, bannerColor.getRGB());
+			}
+		}
+		for (int lineX = -3; lineX < 3; ++lineX) {
+			img.setRGB(mapDrawX + lineX, mapDrawY - 3, black);
+		}
+		for (int lineY = -2; lineY < 3; ++lineY) {
+			img.setRGB(mapDrawX - 2, mapDrawY + lineY, black);
+			img.setRGB(mapDrawX + 1, mapDrawY + lineY, black);
+		}
+		for (int i = -1; i < 1; ++i) {
+			for (int j = 3; j < 5; ++j) {
+				img.setRGB(mapDrawX + i, mapDrawY + j, black);
+			}
+		}
+	}
+
+	private static void drawFramePosition(BufferedImage img, int x, int z) {
+		final int mapDrawX = Math.max(2, Math.min(img.getWidth() - 2, x));
+		final int mapDrawY = Math.max(2, Math.min(img.getHeight() - 2, z));
+		final int black = Color.BLACK.getRGB();
+		for (int i = -1; i < 2; ++i) {
+			for (int j = -1; j < 2; ++j) {
+				img.setRGB(mapDrawX + i, mapDrawY + j, Colors.lerp(Colors.WHITE, Colors.LIME, 0.4f + (Math.abs(i) + Math.abs(j)) * 0.3f).getRGB());
+			}
+		}
+		for (int lineX = -1; lineX < 2; ++lineX) {
+			img.setRGB(mapDrawX + lineX, mapDrawY - 2, black);
+			img.setRGB(mapDrawX + lineX, mapDrawY + 2, black);
+		}
+		for (int lineY = -1; lineY < 2; ++lineY) {
+			img.setRGB(mapDrawX - 2, mapDrawY + lineY, black);
+			img.setRGB(mapDrawX + 2, mapDrawY + lineY, black);
+		}
+	}
 	
 	private Color getColorByByte(short colorIdx) {
-		Color mappedColor = new Color(0,0,0);
+		Color mappedColor = new Color(0,0,0, 0);
 		// Log.info("color idx: "+colorIdx);
 		switch(colorIdx) {
-			case 0: mappedColor = new Color(0, 0, 0); break;
-			case 1: mappedColor = new Color(0, 0, 0); break;
-			case 2: mappedColor = new Color(0, 0, 0); break;
-			case 3: mappedColor = new Color(0, 0, 0); break;
+			case 0: mappedColor = new Color(0, 0, 0, 0); break;
+			case 1: mappedColor = new Color(0, 0, 0, 0); break;
+			case 2: mappedColor = new Color(0, 0, 0, 0); break;
+			case 3: mappedColor = new Color(0, 0, 0, 0); break;
 			case 4: mappedColor = new Color(88, 124, 39); break;
 			case 5: mappedColor = new Color(108, 151, 47); break;
 			case 6: mappedColor = new Color(125, 176, 55); break;

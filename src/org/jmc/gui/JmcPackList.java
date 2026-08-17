@@ -4,6 +4,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import javax.swing.DefaultListModel;
 import javax.swing.JList;
@@ -13,6 +14,8 @@ import com.google.gson.Gson;
 
 public class JmcPackList extends JList<File> {
 	private static final long serialVersionUID = 3278592346405844376L;
+
+	private boolean bDirty = false;
 	
 	public JmcPackList() {
 		super(new DefaultListModel<File>());
@@ -35,6 +38,7 @@ public class JmcPackList extends JList<File> {
 		int selected = getSelectedIndex();
 		if (selected == -1) return false;
 		getModel().remove(selected);
+		this.markDirty();
 		return true;
 	}
 	
@@ -45,6 +49,7 @@ public class JmcPackList extends JList<File> {
 		File elem = model.remove(selected);
 		model.add(--selected, elem);
 		setSelectedIndex(selected);
+		this.markDirty();
 		return true;
 	}
 	
@@ -55,15 +60,12 @@ public class JmcPackList extends JList<File> {
 		File elem = model.remove(selected);
 		model.add(++selected, elem);
 		setSelectedIndex(selected);
+		this.markDirty();
 		return true;
 	}
 	
 	public String getPrefString() {
-		ArrayList<String> files = new ArrayList<>();
-		for (File file : getList()) {
-			files.add(file.getAbsolutePath());
-		}
-		return new Gson().toJson(files);
+		return new Gson().toJson(getList().stream().map(File::getAbsolutePath).distinct().collect(Collectors.toList()));
 	}
 	
 	public void loadPrefString(String str) {
@@ -84,5 +86,23 @@ public class JmcPackList extends JList<File> {
 	
 	public void reset() {
 		getModel().clear();
+		this.markDirty();
 	}
+
+	public void markDirty() {
+		this.bDirty = true;
+	}
+
+    public boolean isDirty() {
+        return this.bDirty;
+    }
+
+	public void clearDirty() {
+		this.bDirty = false;
+	}
+
+    public void addPackAt(int index, File selectedFile) {
+        this.getModel().add(index, selectedFile);
+		this.markDirty();
+    }
 }

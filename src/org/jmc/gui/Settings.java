@@ -14,6 +14,9 @@ import java.awt.event.WindowEvent;
 import java.awt.event.WindowListener;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.prefs.BackingStoreException;
@@ -38,6 +41,43 @@ import javax.swing.border.EmptyBorder;
 public class Settings extends JmcFrame implements WindowListener, ChangeListener {
 
 	private static final long serialVersionUID = -5546934145954405065L;
+
+	public static final Path SETTINGS_BASE_DIR;
+	public static final Path PACK_LIST_PATH;
+
+	static {
+		String userHome = System.getProperty("user.home");
+
+		Path basePath;
+		switch (Filesystem.OS) {
+            case WIN: {
+	            String appData = System.getenv("APPDATA");
+				if (appData != null && !appData.isEmpty()) {
+					basePath = Paths.get(appData);
+				} else {
+					basePath = Paths.get(userHome, "AppData", "Roaming");
+				}
+				break;
+			}
+			case MAC: {
+				basePath = Paths.get(userHome, "Library", "Application Support");
+				break;
+			}
+			case OTHER_LINUX:
+            default: {
+	            String xdgConfig = System.getenv("XDG_CONFIG_HOME");
+				if (xdgConfig != null && !xdgConfig.isEmpty()) {
+					basePath = Paths.get(xdgConfig);
+				} else {
+					basePath = Paths.get(userHome, ".config");
+				}
+			}
+		}
+
+		SETTINGS_BASE_DIR = basePath.resolve("jmc2obj/settings");
+
+		PACK_LIST_PATH = SETTINGS_BASE_DIR.resolve("resource_packs.json");
+	}
 
 	private Preferences prefs;
 
@@ -246,7 +286,7 @@ public class Settings extends JmcFrame implements WindowListener, ChangeListener
 				}
 				
 				for (File file: files) {
-					listPacks.getModel().add(0, file);
+					listPacks.addPackAt(0, file);
 				}
 				listPacks.setSelectedIndex(0);
 				saveSettings();
@@ -298,7 +338,7 @@ public class Settings extends JmcFrame implements WindowListener, ChangeListener
 						return;
 					}
 
-					listPacksModel.add(0, selectedFile);
+					listPacks.addPackAt(0, selectedFile);
 				}
 
 				listPacks.setSelectedIndex(0);
@@ -442,9 +482,14 @@ public class Settings extends JmcFrame implements WindowListener, ChangeListener
 			cbSelect.setSelectedIndex(prefs.getInt("SELECT_ACTION", 0));
 			cbLang.setSelectedIndex(prefs.getInt("LANGUAGE", 0));
 			spPrevThreads.setValue(prefs.getInt("PREVIEW_THREADS", 8));
-			listPacks.loadPrefString(prefs.get("RESOURCE_PACKS", "[]"));
+			String packs = prefs.get("RESOURCE_PACKS", "[]");
+			try {
+				packs = new String(Files.readAllBytes(PACK_LIST_PATH));
+			} catch (Exception ignore) {
+			}
+			listPacks.loadPrefString(packs);
 			chckbxUsePackDefault.setSelected(prefs.getBoolean("USE_DEFAULT_RESOURCE_PACK", true));
-		} catch (IllegalArgumentException e) {
+		} catch (Exception e) {
 			Log.error("Error loading settings! Resetting...", e);
 			resetSettings();
 		}
@@ -461,10 +506,20 @@ public class Settings extends JmcFrame implements WindowListener, ChangeListener
 			prefs.putInt("LANGUAGE", cbLang.getSelectedIndex());
 			taRestart.setVisible(true);
 		}
-		try {
-			prefs.put("RESOURCE_PACKS", listPacks.getPrefString());
-		} catch (IllegalArgumentException e) {
-			Log.error("Resource pack list could not be saved!", e);
+		if (listPacks.isDirty()) {
+			try {
+				Path dir = PACK_LIST_PATH.getParent();
+				if (!Files.isDirectory(dir)) {
+					Files.createDirectories(dir);
+				}
+				if (!Files.exists(PACK_LIST_PATH)) {
+					Files.createFile(PACK_LIST_PATH);
+				}
+				Files.write(PACK_LIST_PATH, listPacks.getPrefString().getBytes());
+				listPacks.clearDirty();
+			} catch (Exception e) {
+				Log.error("Resource pack list could not be saved!", e);
+			}
 		}
 		prefs.putBoolean("USE_DEFAULT_RESOURCE_PACK", chckbxUsePackDefault.isSelected());
 	}

@@ -1,5 +1,7 @@
 package org.jmc.registry;
 
+import java.lang.reflect.Type;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -7,10 +9,8 @@ import java.util.Map.Entry;
 
 import javax.annotation.Nonnull;
 
+import com.google.gson.*;
 import org.jmc.geom.Vertex;
-
-import com.google.gson.Gson;
-import com.google.gson.JsonObject;
 
 public class ModelEntry extends RegistryEntry {
 	public RegistryModel model;
@@ -22,7 +22,7 @@ public class ModelEntry extends RegistryEntry {
 
 	public static ModelEntry parseJson(NamespaceID id, JsonObject json) {
 		ModelEntry entry = new ModelEntry(id);
-		entry.model = new Gson().fromJson(json, RegistryModel.class);
+		entry.model = RegistryModel.CONVERTER.fromJson(json, RegistryModel.class);
 		if (entry.model.parent != null) {
 			entry.model.parentEntry = Registries.getModel(entry.model.parent);
 		}
@@ -73,6 +73,7 @@ public class ModelEntry extends RegistryEntry {
 	}
 	
 	public static class RegistryModel {
+		private static final Gson CONVERTER = new GsonBuilder().registerTypeAdapter(RegistryModel.class, new RegistryModelConverter()).create();
 		private transient ModelEntry parentEntry;
 		private NamespaceID parent;
 		@Nonnull
@@ -121,6 +122,37 @@ public class ModelEntry extends RegistryEntry {
 					return new Gson().toJson(this);
 				}
 			}
+		}
+	}
+
+	static class RegistryModelConverter implements JsonDeserializer<RegistryModel> {
+		@Override
+		public RegistryModel deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context) throws JsonParseException {
+			JsonObject object = json.getAsJsonObject();
+			RegistryModel result = new RegistryModel();
+			if (object.has("parent")) {
+				result.parent = NamespaceID.fromString(object.get("parent").getAsString());
+			}
+			if (object.has("textures")) {
+				for (Entry<String, JsonElement> entry : object.getAsJsonObject("textures").entrySet()) {
+					JsonElement elem = entry.getValue();
+					if (elem.isJsonObject()) {
+						JsonObject texObj = elem.getAsJsonObject();
+						if (texObj.has("sprite")) {
+							result.textures.put(entry.getKey(), texObj.get("sprite").getAsString());
+						}
+					} else {
+						result.textures.put(entry.getKey(), elem.getAsString());
+					}
+				}
+			}
+			if (object.has("elements")) {
+				result.elements = new ArrayList<>();
+				for (JsonElement element : object.get("elements").getAsJsonArray()) {
+					result.elements.add(context.deserialize(element, RegistryModel.ModelElement.class));
+				}
+			}
+			return result;
 		}
 	}
 	

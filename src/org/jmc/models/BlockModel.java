@@ -157,20 +157,104 @@ public abstract class BlockModel {
 		}
 
 		switch (neighbourData.getInfo().getOcclusion()) {
-		case FULL:
-			return false;
 		case NONE:
 			return true;
 		case TRANSPARENT:
-		case VOLUME:
 			return !neighbourData.id.equals(data.id);
+		case VOLUME:
+			return !(neighbourData.id.equals(data.id) && neighbourData.state.maskMatches(data.state));
 		case BOTTOM:
 			return side != Direction.UP;
+		case SLABS: {
+			final String neighbourType = neighbourData.state.get("type");
+			final String type = (data.id.path.contains("slab")) ? data.state.getOrDefault("type", "none") : "none";
+			if (side == Direction.UP) {
+				return neighbourType.equals("top") || !type.equals("top");
+			}
+			if (side == Direction.DOWN) {
+				return neighbourType.equals("bottom") || !type.equals("bottom");
+			}
+			return !neighbourType.equals("double") && !neighbourType.equals(type);
+		}
+		case STAIRS: {
+			final String neighbourHalf = neighbourData.state.get("half");
+			if (neighbourHalf.equals("bottom") && side == Direction.UP) {
+				return false;
+			}
+			if (neighbourHalf.equals("top") && side == Direction.DOWN) {
+				return false;
+			}
+
+			final String neighbourFacing = neighbourData.state.get("facing");
+			final String neighbourShape = neighbourData.state.get("shape");
+			if (neighbourShape.equals("straight") || neighbourShape.contains("inner_")) {
+				if (getReverseDirection(neighbourFacing) == side) {
+					return false;
+				}
+				if (isReverseInnerDirection(neighbourFacing, neighbourShape, side)) {
+					return false;
+				}
+			}
+
+			if (!data.state.containsKey("half") || !data.state.containsKey("facing") || !data.state.containsKey("shape")) {
+				return true;
+			}
+			return !neighbourHalf.equals(data.state.get("half")) &&
+					!neighbourFacing.equals(data.state.get("facing")) &&
+					!neighbourShape.equals(data.state.get("shape"));
+		}
 		case CUSTOM:
 			return !neighbourData.getInfo().getModel().getCustomOcclusion(side.getOpposite(), data, neighbourData);
+		case FULL:
 		default:
 			return false;
 		}
+	}
+
+	private static Direction getReverseDirection(String facing) {
+		switch (facing) {
+			case "north":
+				return Direction.SOUTH;
+			case "south":
+				return Direction.NORTH;
+			case "west":
+				return Direction.EAST;
+			case "east":
+				return Direction.WEST;
+			default:
+				return null;
+		}
+	}
+
+	private static boolean isReverseInnerDirection(String facing, String shape, Direction side) {
+		if (shape.equals("inner_left")) {
+			switch (facing) {
+				case "north":
+					return side == Direction.SOUTH || side == Direction.EAST;
+				case "south":
+					return side == Direction.NORTH || side == Direction.WEST;
+				case "west":
+					return side == Direction.EAST || side == Direction.NORTH;
+				case "east":
+					return side == Direction.WEST || side == Direction.SOUTH;
+				default:
+					return false;
+			}
+		} else if (shape.equals("inner_right")) {
+			switch (facing) {
+				case "north":
+					return side == Direction.SOUTH || side == Direction.WEST;
+				case "south":
+					return side == Direction.NORTH || side == Direction.EAST;
+				case "west":
+					return side == Direction.EAST || side == Direction.SOUTH;
+				case "east":
+					return side == Direction.WEST || side == Direction.NORTH;
+				default:
+					return false;
+			}
+		}
+		return false;
 	}
 
 	/**

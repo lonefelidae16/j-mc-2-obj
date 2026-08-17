@@ -19,6 +19,26 @@ import javax.annotation.CheckForNull;
  * File and directory related methods.
  */
 public class Filesystem {
+	public enum OperatingSystem {
+		WIN,
+		MAC,
+		OTHER_LINUX
+	}
+
+	public static final OperatingSystem OS;
+
+	static {
+		String os = System.getProperty("os.name").toLowerCase();
+
+		if (os.contains("win")) {
+			OS = OperatingSystem.WIN;
+		} else if (os.contains("mac")) {
+			OS = OperatingSystem.MAC;
+		} else {
+			OS = OperatingSystem.OTHER_LINUX;
+		}
+	}
+
 	/**
 	 * Compare two version numbers
 	 * 
@@ -55,11 +75,9 @@ public class Filesystem {
 	 */
 	public static File getMinecraftDir() {
 		String minecraft = "minecraft";
-		String osname = System.getProperty("os.name").toLowerCase();
 		String default_home = System.getProperty("user.home", ".");
 
-		if (osname.contains("solaris") || osname.contains("sunos") || osname.contains("linux")
-				|| osname.contains("unix")) {
+		if (OS == OperatingSystem.OTHER_LINUX) {
 			File mcDir = new File(default_home, "." + minecraft);
 			if (mcDir.isDirectory()) {
 				return mcDir;
@@ -68,7 +86,7 @@ public class Filesystem {
 			}
 		}
 
-		if (osname.contains("win")) {
+		if (OS == OperatingSystem.WIN) {
 			String win_home = System.getenv("APPDATA");
 			if (win_home != null)
 				return new File(win_home, "." + minecraft);
@@ -76,7 +94,7 @@ public class Filesystem {
 				return new File(default_home, "." + minecraft);
 		}
 
-		if (osname.contains("mac")) {
+		if (OS == OperatingSystem.MAC) {
 			return new File(default_home, "Library/Application Support/" + minecraft);
 		}
 
