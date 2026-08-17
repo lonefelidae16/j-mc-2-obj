@@ -8,14 +8,13 @@
 package org.jmc;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.UUID;
 import java.util.zip.GZIPInputStream;
 
-import org.jmc.NBT.NBT_Tag;
-import org.jmc.NBT.TAG_Compound;
-import org.jmc.NBT.TAG_Int;
-import org.jmc.NBT.TAG_List;
+import org.jmc.NBT.*;
 import org.jmc.util.Log;
 
 /**
@@ -26,53 +25,47 @@ import org.jmc.util.Log;
  *
  */
 public class LevelDat {
-	
+
 	/**
 	 * Path to the save.
 	 */
-	private File levelDir;
+	private Path levelDir;
 	/**
-	 * The root of the NBT structure for this file. 
+	 * The root of the NBT structure for this file.
 	 */
 	private TAG_Compound root;
-	
+
 	/**
 	 * Main constructor.
 	 * @param levelDir path to the save
 	 */
 	public LevelDat(File levelDir)
 	{
-		this.levelDir=levelDir;
+		this.levelDir=levelDir.toPath();
 	}
-	
+
 	/**
 	 * Opens the file.
 	 * @return returns true if the operation was successful or false if the file doesn't exist or there is another error
 	 */
 	public boolean open()
 	{
-		File levelFile=new File(levelDir.getAbsolutePath()+"/level.dat");
-		
-		if(!levelFile.exists()) return false;
-			
-		try {
-			
-			GZIPInputStream stream = new GZIPInputStream(new FileInputStream(levelFile));
-			
+		Path levelFile=levelDir.resolve("level.dat");
+
+		if(!Files.exists(levelFile)) return false;
+
+		try (GZIPInputStream stream = new GZIPInputStream(Files.newInputStream(levelFile))) {
 			root=(TAG_Compound) NBT_Tag.make(stream);
-			
-			stream.close();
-			
 		} catch (FileNotFoundException e) {
 			return false;
 		} catch (Exception e) {
 			Log.error("Error reading level.dat", e, false);
 			return false;
-		}			
-	
+		}
+
 		return true;
 	}
-	
+
 	/**
 	 * Gets the position of the player.
 	 * @return returns a list of X,Y,Z NBT_Float values, or null if the information is not available
@@ -81,13 +74,29 @@ public class LevelDat {
 	{
 		TAG_Compound data=(TAG_Compound) root.getElement("Data");
 		if (data==null) return null;
-		TAG_Compound player=(TAG_Compound) data.getElement("Player");
-		if (player==null) return null;
-		return (TAG_List)player.getElement("Pos");
+		TAG_Int_Array uuid = (TAG_Int_Array) data.getElement("singleplayer_uuid");
+		TAG_Compound player;
+		if (uuid == null) {
+			player = (TAG_Compound) data.getElement("Player");
+			if (player == null) return null;
+			return (TAG_List) player.getElement("Pos");
+		}
+		assert uuid.data.length == 4;
+		UUID uuid_obj = new UUID(((long) uuid.data[0] << 32) | uuid.data[1] & 0xFFFFFFFFL, ((long) uuid.data[2] << 32) | uuid.data[3] & 0xFFFFFFFFL);
+		Path player_dat = levelDir.resolve("players").resolve("data").resolve(uuid_obj + ".dat");
+		try (GZIPInputStream stream = new GZIPInputStream(Files.newInputStream(player_dat))){
+			player = (TAG_Compound) NBT_Tag.make(stream);
+		} catch (FileNotFoundException e) {
+			return null;
+		} catch (Exception e) {
+			Log.error("Error reading " + levelDir.relativize(player_dat), e, false);
+			return null;
+		}
+		return (TAG_List) player.getElement("Pos");
 	}
-	
+
 	/**
-	 * Gets the X location of the spawn. 
+	 * Gets the X location of the spawn.
 	 * @return x coordinate, or 0 if the information is not available
 	 */
 	public int getSpawnX()
@@ -98,7 +107,7 @@ public class LevelDat {
 		if (pos==null) return 0;
 		return pos.value;
 	}
-	
+
 	/**
 	 * Gets the Z location of the spawn.
 	 * @return z coordinate, or 0 if the information is not available
@@ -111,12 +120,12 @@ public class LevelDat {
 		if (pos==null) return 0;
 		return pos.value;
 	}
-	
+
 	/**
 	 * Prints the description and content of the file into a String.
 	 */
 	public String toString()
 	{
-		return "DAT file "+levelDir.getAbsolutePath()+"/level.dat:\n"+root;
+		return "DAT file "+levelDir.toAbsolutePath()+"/level.dat:\n"+root;
 	}
 }
